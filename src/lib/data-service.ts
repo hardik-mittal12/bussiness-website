@@ -32,6 +32,10 @@ if (!globalStore.__wholesaleStore) {
 }
 const localStore = globalStore.__wholesaleStore;
 
+function isStrictProduction(): boolean {
+  return process.env.NODE_ENV === 'production';
+}
+
 export async function getBusinessSettings(): Promise<BusinessSettings> {
   const supabase = await createServerSupabaseClient();
   if (supabase) {
@@ -40,6 +44,10 @@ export async function getBusinessSettings(): Promise<BusinessSettings> {
       .select('*')
       .eq('id', 'default')
       .single();
+    if (error && isStrictProduction()) {
+      console.error('Failed to get business settings from Supabase:', error);
+      throw new Error(`Database query failed: ${error.message}`);
+    }
     if (!error && data) {
       return data as BusinessSettings;
     }
@@ -62,6 +70,10 @@ export async function updateBusinessSettings(updates: Partial<BusinessSettings>)
     return data as BusinessSettings;
   }
 
+  if (isStrictProduction()) {
+    throw new Error('Database write rejected: Persistent Supabase database connection is not configured or unavailable in production.');
+  }
+
   localStore.businessSettings = {
     ...localStore.businessSettings,
     ...updates,
@@ -78,6 +90,9 @@ export async function getCategories(includeInactive = false): Promise<Category[]
       query = query.eq('is_active', true);
     }
     const { data, error } = await query;
+    if (error && isStrictProduction()) {
+      throw new Error(`Failed to fetch categories: ${error.message}`);
+    }
     if (!error && data) {
       return data as Category[];
     }
@@ -94,6 +109,9 @@ export async function getBrands(): Promise<Brand[]> {
   const supabase = await createServerSupabaseClient();
   if (supabase) {
     const { data, error } = await supabase.from('brands').select('*').order('name');
+    if (error && isStrictProduction()) {
+      throw new Error(`Failed to fetch brands: ${error.message}`);
+    }
     if (!error && data) {
       return data as Brand[];
     }
@@ -188,6 +206,10 @@ export async function getProducts({
     const from = (page - 1) * limit;
     const to = from + limit - 1;
     const { data, count, error } = await query.range(from, to);
+
+    if (error && isStrictProduction()) {
+      throw new Error(`Failed to fetch products: ${error.message}`);
+    }
 
     if (!error && data) {
       return {
@@ -291,6 +313,9 @@ export async function getProductBySlug(slug: string, includeUnpublished = false)
     }
 
     const { data, error } = await query.single();
+    if (error && error.code !== 'PGRST116' && isStrictProduction()) {
+      throw new Error(`Failed to fetch product by slug: ${error.message}`);
+    }
     if (!error && data) {
       return data as unknown as Product;
     }
@@ -323,9 +348,13 @@ export async function getProductById(id: string): Promise<Product | null> {
       `)
       .eq('id', id)
       .single();
+    if (error && error.code !== 'PGRST116' && isStrictProduction()) {
+      throw new Error(`Failed to fetch product by ID: ${error.message}`);
+    }
     if (!error && data) {
       return data as unknown as Product;
     }
+    return null;
   }
 
   const p = localStore.products.find((prod) => prod.id === id);
@@ -407,6 +436,10 @@ export async function createProduct(productData: Partial<Product> & { images?: P
     return newProduct;
   }
 
+  if (isStrictProduction()) {
+    throw new Error('Database write rejected: Persistent Supabase database connection is not configured or unavailable in production.');
+  }
+
   localStore.products.unshift(newProduct);
   return newProduct;
 }
@@ -444,6 +477,10 @@ export async function updateProduct(id: string, updates: Partial<Product> & { im
     return updated;
   }
 
+  if (isStrictProduction()) {
+    throw new Error('Database write rejected: Persistent Supabase database connection is not configured or unavailable in production.');
+  }
+
   const idx = localStore.products.findIndex((p) => p.id === id);
   if (idx === -1) throw new Error('Product not found');
 
@@ -479,6 +516,10 @@ export async function deleteProduct(id: string): Promise<boolean> {
     return true;
   }
 
+  if (isStrictProduction()) {
+    throw new Error('Database write rejected: Persistent Supabase database connection is not configured or unavailable in production.');
+  }
+
   const initialLen = localStore.products.length;
   localStore.products = localStore.products.filter((p) => p.id !== id);
   return localStore.products.length < initialLen;
@@ -501,6 +542,10 @@ export async function createCategory(cat: Omit<Category, 'id' | 'created_at' | '
     return newCat;
   }
 
+  if (isStrictProduction()) {
+    throw new Error('Database write rejected: Persistent Supabase database connection is not configured or unavailable in production.');
+  }
+
   localStore.categories.push(newCat);
   return newCat;
 }
@@ -521,6 +566,10 @@ export async function updateCategory(id: string, updates: Partial<Category>): Pr
     return updated;
   }
 
+  if (isStrictProduction()) {
+    throw new Error('Database write rejected: Persistent Supabase database connection is not configured or unavailable in production.');
+  }
+
   const idx = localStore.categories.findIndex((c) => c.id === id);
   if (idx === -1) throw new Error('Category not found');
   localStore.categories[idx] = {
@@ -532,20 +581,41 @@ export async function updateCategory(id: string, updates: Partial<Category>): Pr
 }
 
 export async function deleteCategory(id: string): Promise<{ success: boolean; error?: string }> {
-  // Prevent deletion of categories that are still referenced by products
+  const supabase = await createServerSupabaseClient();
+  if (supabase) {
+    // Check product count using supabase to prevent deleting a category with attached products
+    const { count, error: countError } = await supabase
+      .from('products')
+      .select('id', { count: 'exact', head: true })
+      .eq('category_id', id);
+
+    if (countError && isStrictProduction()) {
+      throw new Error(`Failed to verify products referencing category: ${countError.message}`);
+    }
+
+    if (!countError && typeof count === 'number' && count > 0) {
+      return {
+        success: false,
+        error: `Cannot delete category: ${count} product(s) are currently assigned to this category. Reassign or delete them first.`,
+      };
+    }
+
+    const { error } = await supabase.from('categories').delete().eq('id', id);
+    if (error) return { success: false, error: error.message };
+    return { success: true };
+  }
+
+  if (isStrictProduction()) {
+    throw new Error('Database write rejected: Persistent Supabase database connection is not configured or unavailable in production.');
+  }
+
+  // Fallback check against in-memory store
   const productsUsingCat = localStore.products.filter((p) => p.category_id === id);
   if (productsUsingCat.length > 0) {
     return {
       success: false,
       error: `Cannot delete category: ${productsUsingCat.length} product(s) are currently assigned to this category. Reassign or delete them first.`,
     };
-  }
-
-  const supabase = await createServerSupabaseClient();
-  if (supabase) {
-    const { error } = await supabase.from('categories').delete().eq('id', id);
-    if (error) return { success: false, error: error.message };
-    return { success: true };
   }
 
   localStore.categories = localStore.categories.filter((c) => c.id !== id);
@@ -592,6 +662,10 @@ export async function submitEnquiry(
     return newEnquiry;
   }
 
+  if (isStrictProduction()) {
+    throw new Error('Database write rejected: Persistent Supabase database connection is not configured or unavailable in production.');
+  }
+
   localStore.enquiries.unshift(newEnquiry);
   return newEnquiry;
 }
@@ -611,6 +685,9 @@ export async function getEnquiries({
       query = query.or(`name.ilike.${term},shop_name.ilike.${term},phone.ilike.${term},city.ilike.${term}`);
     }
     const { data, error } = await query;
+    if (error && isStrictProduction()) {
+      throw new Error(`Failed to fetch enquiries: ${error.message}`);
+    }
     if (!error && data) {
       return data as Enquiry[];
     }
@@ -646,8 +723,18 @@ export async function updateEnquiryStatus(
     if (followUpDate !== undefined) {
       updatePayload.follow_up_date = followUpDate;
     }
-    const { error } = await supabase.from('enquiries').update(updatePayload).eq('id', id);
+    const { data, error } = await supabase
+      .from('enquiries')
+      .update(updatePayload)
+      .eq('id', id)
+      .select('*, notes:enquiry_notes(*)')
+      .single();
     if (error) throw new Error(error.message);
+    return data as Enquiry;
+  }
+
+  if (isStrictProduction()) {
+    throw new Error('Database write rejected: Persistent Supabase database connection is not configured or unavailable in production.');
   }
 
   const enq = localStore.enquiries.find((e) => e.id === id);
@@ -673,6 +760,11 @@ export async function addEnquiryNote(enquiryId: string, noteText: string): Promi
       created_at: now,
     });
     if (error) throw new Error(error.message);
+    return;
+  }
+
+  if (isStrictProduction()) {
+    throw new Error('Database write rejected: Persistent Supabase database connection is not configured or unavailable in production.');
   }
 
   const enq = localStore.enquiries.find((e) => e.id === enquiryId);
@@ -695,6 +787,10 @@ export async function deleteEnquiry(id: string): Promise<boolean> {
     const { error } = await supabase.from('enquiries').delete().eq('id', id);
     if (error) throw new Error(error.message);
     return true;
+  }
+
+  if (isStrictProduction()) {
+    throw new Error('Database write rejected: Persistent Supabase database connection is not configured or unavailable in production.');
   }
 
   const len = localStore.enquiries.length;

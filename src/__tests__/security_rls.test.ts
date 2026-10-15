@@ -38,10 +38,16 @@ describe('Security & Row Level Security (RLS) Policies Audit', () => {
     expect(rlsSql).toContain("role = 'admin'");
   });
 
-  it('contains trigger to prevent self-role elevation by ordinary users', () => {
+  it('contains trigger to prevent self-role elevation by ordinary users on insert and update', () => {
     const rlsSql = fs.readFileSync(rlsSqlPath, 'utf-8');
-    expect(rlsSql).toContain('check_profile_role_update');
+    expect(rlsSql).toContain('check_profile_role_guard');
     expect(rlsSql).toContain('Unauthorized role modification');
+    expect(rlsSql).toContain('Unauthorized admin role creation');
+  });
+
+  it('verifies category foreign key uses ON DELETE RESTRICT to prevent orphaned product relations', () => {
+    const schemaSql = fs.readFileSync(schemaSqlPath, 'utf-8');
+    expect(schemaSql).toContain('category_id uuid references public.categories(id) on delete restrict');
   });
 
   it('restricts public product reads strictly to status = published', () => {

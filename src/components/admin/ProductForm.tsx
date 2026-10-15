@@ -12,7 +12,8 @@ import {
   Loader2, 
   AlertCircle, 
   CheckCircle2, 
-  Image as ImageIcon 
+  Image as ImageIcon,
+  Upload 
 } from 'lucide-react';
 import { Product, Category, Brand, ProductImage } from '@/lib/types';
 import { productSchema } from '@/lib/validation';
@@ -65,6 +66,8 @@ export default function ProductForm({
   );
 
   const [newImageUrl, setNewImageUrl] = useState('');
+  const [isUploading, setIsUploading] = useState(false);
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [serverError, setServerError] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
@@ -90,6 +93,52 @@ export default function ProductForm({
       .replace(/[^\w\s-]/g, '')
       .replace(/[\s_-]+/g, '-')
       .replace(/^-+|-+$/g, '');
+  };
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    e.target.value = '';
+
+    if (file.size > 5 * 1024 * 1024) {
+      setServerError('Image file size must be less than 5MB.');
+      return;
+    }
+
+    setIsUploading(true);
+    setServerError(null);
+
+    try {
+      const uploadData = new FormData();
+      uploadData.append('file', file);
+
+      const res = await fetch('/api/admin/upload', {
+        method: 'POST',
+        body: uploadData,
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to upload image');
+      }
+
+      setIsDirty(true);
+      setImages((prev) => [
+        ...prev,
+        {
+          id: crypto.randomUUID(),
+          image_url: data.url,
+          alt_text: formData.name || 'Product Image',
+          display_order: prev.length,
+          is_primary: prev.length === 0,
+        },
+      ]);
+    } catch (err: unknown) {
+      setServerError(err instanceof Error ? err.message : 'Image upload failed');
+    } finally {
+      setIsUploading(false);
+    }
   };
 
   const addImage = () => {
@@ -600,23 +649,55 @@ export default function ProductForm({
               ))}
             </div>
 
-            {/* Add Image URL input */}
-            <div className="pt-2 flex gap-2">
+            {/* Upload or Add Image URL */}
+            <div className="pt-2 space-y-2">
               <input
-                type="url"
-                value={newImageUrl}
-                onChange={(e) => setNewImageUrl(e.target.value)}
-                placeholder="Enter image URL (HTTPS / Supabase Storage)..."
-                className="flex-1 px-3.5 py-2 text-xs rounded-lg border border-slate-300 bg-white focus:outline-hidden focus:ring-2 focus:ring-blue-950"
+                type="file"
+                ref={fileInputRef}
+                onChange={handleFileUpload}
+                accept="image/jpeg,image/png,image/webp,image/avif"
+                className="hidden"
               />
-              <button
-                type="button"
-                onClick={addImage}
-                className="inline-flex items-center px-3.5 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-semibold"
-              >
-                <Plus className="w-3.5 h-3.5 mr-1" />
-                Add Image
-              </button>
+
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  disabled={isUploading}
+                  onClick={() => fileInputRef.current?.click()}
+                  className="inline-flex items-center px-3.5 py-2 rounded-lg bg-blue-950 hover:bg-blue-900 text-white text-xs font-semibold shadow-xs disabled:opacity-50"
+                >
+                  {isUploading ? (
+                    <>
+                      <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+                      Uploading...
+                    </>
+                  ) : (
+                    <>
+                      <Upload className="w-3.5 h-3.5 mr-1.5" />
+                      Upload Photo
+                    </>
+                  )}
+                </button>
+                <span className="text-[11px] text-slate-400">JPG, PNG, WebP up to 5MB</span>
+              </div>
+
+              <div className="flex gap-2 pt-1">
+                <input
+                  type="url"
+                  value={newImageUrl}
+                  onChange={(e) => setNewImageUrl(e.target.value)}
+                  placeholder="Or paste external image URL..."
+                  className="flex-1 px-3.5 py-2 text-xs rounded-lg border border-slate-300 bg-white focus:outline-hidden focus:ring-2 focus:ring-blue-950"
+                />
+                <button
+                  type="button"
+                  onClick={addImage}
+                  className="inline-flex items-center px-3.5 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-semibold"
+                >
+                  <Plus className="w-3.5 h-3.5 mr-1" />
+                  Add URL
+                </button>
+              </div>
             </div>
           </div>
         </div>

@@ -47,16 +47,20 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: true, redirect: '/admin/dashboard' });
     }
 
-    // Local / Dev Fallback mode when Supabase is not yet connected
-    // Allow administrator testing with standard dev credentials or demo access
-    if (
-      (email === 'admin@apexfootwear.example.com' && password === 'Admin@12345') ||
-      process.env.NODE_ENV === 'development'
-    ) {
+    // In production, Supabase Auth is strictly required - no dev credential bypass
+    if (process.env.NODE_ENV === 'production') {
+      return NextResponse.json(
+        { error: 'Supabase authentication service is not configured in this production environment.' },
+        { status: 503 }
+      );
+    }
+
+    // Local / Dev Fallback mode ONLY allowed in non-production development with exact credentials
+    if (email === 'admin@apexfootwear.example.com' && password === 'Admin@12345') {
       const cookieStore = await cookies();
       cookieStore.set('dev_admin_session', 'true', {
         httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
+        secure: false,
         sameSite: 'lax',
         path: '/',
         maxAge: 60 * 60 * 24, // 24 hours
@@ -66,7 +70,7 @@ export async function POST(req: NextRequest) {
     }
 
     return NextResponse.json(
-      { error: 'Invalid credentials. For local preview, use admin@apexfootwear.example.com / Admin@12345' },
+      { error: 'Invalid credentials. For local dev preview, use admin@apexfootwear.example.com / Admin@12345' },
       { status: 401 }
     );
   } catch (error: unknown) {

@@ -7,8 +7,22 @@ const rateLimitMap = new Map<string, number>();
 
 export async function POST(req: NextRequest) {
   try {
-    const ip = req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip') || 'unknown';
+    const rawForwarded = req.headers.get('x-forwarded-for');
+    const ip = rawForwarded
+      ? rawForwarded.split(',')[0].trim()
+      : (req.headers.get('x-real-ip') || 'unknown');
+
     const now = Date.now();
+
+    // Prevent memory leak by pruning timestamps older than 60 seconds when map grows
+    if (rateLimitMap.size > 500) {
+      for (const [key, timestamp] of rateLimitMap.entries()) {
+        if (now - timestamp > 60000) {
+          rateLimitMap.delete(key);
+        }
+      }
+    }
+
     const lastTime = rateLimitMap.get(ip);
 
     // Limit to 1 submission every 5 seconds per IP

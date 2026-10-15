@@ -47,19 +47,21 @@ export async function getAdminSession(): Promise<AdminSession> {
     };
   }
 
-  // Fallback dev mode (when Supabase credentials have not been configured yet)
-  const cookieStore = await cookies();
-  const devAuth = cookieStore.get('dev_admin_session')?.value;
-  if (devAuth === 'true') {
-    return {
-      isAuthenticated: true,
-      user: {
-        id: 'dev-admin-id',
-        email: 'admin@apexfootwear.example.com',
-        role: 'admin',
-        name: 'Lead Wholesale Admin',
-      },
-    };
+  // Fallback dev mode (ONLY allowed in non-production local development)
+  if (process.env.NODE_ENV !== 'production') {
+    const cookieStore = await cookies();
+    const devAuth = cookieStore.get('dev_admin_session')?.value;
+    if (devAuth === 'true') {
+      return {
+        isAuthenticated: true,
+        user: {
+          id: 'dev-admin-id',
+          email: 'admin@apexfootwear.example.com',
+          role: 'admin',
+          name: 'Lead Wholesale Admin',
+        },
+      };
+    }
   }
 
   return { isAuthenticated: false, user: null };

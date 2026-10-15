@@ -44,20 +44,27 @@ create policy "Users can read own profile"
   to authenticated
   using (id = auth.uid());
 
--- Prevent non-admins from updating their own role
-create or replace function public.check_profile_role_update()
+-- Prevent non-admins from creating admin profiles or updating their own role
+create or replace function public.check_profile_role_guard()
 returns trigger as $$
 begin
-  if new.role is distinct from old.role and not public.is_admin() then
-    raise exception 'Unauthorized role modification';
+  if tg_op = 'INSERT' then
+    if new.role = 'admin' and not public.is_admin() then
+      raise exception 'Unauthorized admin role creation';
+    end if;
+  elsif tg_op = 'UPDATE' then
+    if new.role is distinct from old.role and not public.is_admin() then
+      raise exception 'Unauthorized role modification';
+    end if;
   end if;
   return new;
 end;
-$$ language plpgsql;
+$$ language plpgsql security definer set search_path = public;
 
+drop trigger if exists tr_check_profile_role on public.profiles;
 create trigger tr_check_profile_role
-  before update on public.profiles
-  for each row execute function public.check_profile_role_update();
+  before insert or update on public.profiles
+  for each row execute function public.check_profile_role_guard();
 
 -- 2. Categories Policies
 -- Public can view active categories
@@ -195,12 +202,17 @@ create policy "Admins can manage redirect mappings"
   using (public.is_admin())
   with check (public.is_admin());
 
--- Storage Bucket Setup & Policies
-insert into storage.buckets (id, name, public)
-values 
-  ('product-images', 'product-images', true),
-  ('business-assets', 'business-assets', true)
-on conflict (id) do update set public = true;
+-- Storage Bucket Setup & Policies (Executed if Supabase storage schema exists)
+do $$
+begin
+  if exists (select 1 from information_schema.schemata where schema_name = 'storage') then
+    insert into storage.buckets (id, name, public)
+    values 
+      ('product-images', 'product-images', true),
+      ('business-assets', 'business-assets', true)
+    on conflict (id) do update set public = true;
+  end if;
+end $$;
 
 -- Storage Objects Policies
 create policy "Public can view product images"

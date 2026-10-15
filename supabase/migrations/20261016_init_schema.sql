@@ -45,7 +45,7 @@ create table if not exists public.products (
   name text not null,
   slug text not null unique,
   sku text unique,
-  category_id uuid references public.categories(id) on delete set null,
+  category_id uuid references public.categories(id) on delete restrict,
   brand_id uuid references public.brands(id) on delete set null,
   short_description text,
   description text,

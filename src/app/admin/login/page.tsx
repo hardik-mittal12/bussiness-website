@@ -141,13 +141,15 @@ export default function AdminLoginPage() {
               Public registration is disabled. Administrator accounts are provisioned exclusively via Supabase Auth with Role Level Security verification.
             </div>
 
-            <button
-              type="button"
-              onClick={fillDevCredentials}
-              className="w-full py-1.5 px-3 text-[11px] font-medium text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-md transition-colors text-center"
-            >
-              Autofill Local Dev Admin Credentials
-            </button>
+            {process.env.NODE_ENV !== 'production' && (
+              <button
+                type="button"
+                onClick={fillDevCredentials}
+                className="w-full py-1.5 px-3 text-[11px] font-medium text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-md transition-colors text-center"
+              >
+                Autofill Local Dev Admin Credentials
+              </button>
+            )}
           </div>
         </div>
 
