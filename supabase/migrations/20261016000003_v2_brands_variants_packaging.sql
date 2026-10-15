@@ -18,7 +18,7 @@ alter table public.products add constraint products_brand_id_fkey foreign key (b
 
 -- 2. Packaging Types Table
 create table if not exists public.packaging_types (
-  id uuid primary key default uuid_generate_v4(),
+  id uuid primary key default gen_random_uuid(),
   name text not null,
   slug text not null unique,
   description text,
@@ -35,7 +35,7 @@ create index if not exists idx_packaging_display on public.packaging_types(is_ac
 
 -- 3. Product Variants (Colours)
 create table if not exists public.product_variants (
-  id uuid primary key default uuid_generate_v4(),
+  id uuid primary key default gen_random_uuid(),
   product_id uuid not null references public.products(id) on delete cascade,
   colour_name text not null,
   colour_family text,
@@ -73,6 +73,7 @@ alter table public.packaging_types enable row level security;
 alter table public.product_variants enable row level security;
 
 -- Brands RLS: Active brands public, admins full access
+drop policy if exists "Public can view brands" on public.brands;
 drop policy if exists "Anyone can view brands" on public.brands;
 drop policy if exists "Anyone can view active brands" on public.brands;
 create policy "Anyone can view active brands"

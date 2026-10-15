@@ -3,8 +3,13 @@ import fs from 'fs';
 import path from 'path';
 
 describe('Security & Row Level Security (RLS) Policies Audit', () => {
-  const schemaSqlPath = path.resolve(__dirname, '../../supabase/migrations/20261016_init_schema.sql');
-  const rlsSqlPath = path.resolve(__dirname, '../../supabase/migrations/20261016_rls_policies.sql');
+  const migrationsDir = path.resolve(__dirname, '../../supabase/migrations');
+  const findMigration = (name: string) => {
+    const file = fs.readdirSync(migrationsDir).find(f => f.endsWith(name));
+    return file ? path.join(migrationsDir, file) : '';
+  };
+  const schemaSqlPath = findMigration('init_schema.sql');
+  const rlsSqlPath = findMigration('rls_policies.sql');
 
   it('verifies SQL schema and RLS migration files exist', () => {
     expect(fs.existsSync(schemaSqlPath)).toBe(true);
@@ -71,7 +76,7 @@ describe('Security & Row Level Security (RLS) Policies Audit', () => {
   });
 
   it('audits V2 migration for RLS on packaging_types and product_variants and safe referential integrity', () => {
-    const v2SqlPath = path.resolve(__dirname, '../../supabase/migrations/20261016_v2_brands_variants_packaging.sql');
+    const v2SqlPath = findMigration('v2_brands_variants_packaging.sql');
     expect(fs.existsSync(v2SqlPath)).toBe(true);
     const v2Sql = fs.readFileSync(v2SqlPath, 'utf-8');
 

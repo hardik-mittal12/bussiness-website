@@ -16,7 +16,7 @@ create table if not exists public.profiles (
 
 -- 2. Categories
 create table if not exists public.categories (
-  id uuid primary key default uuid_generate_v4(),
+  id uuid primary key default gen_random_uuid(),
   name text not null,
   slug text not null unique,
   description text,
@@ -32,7 +32,7 @@ create index if not exists idx_categories_display on public.categories(is_active
 
 -- 3. Brands
 create table if not exists public.brands (
-  id uuid primary key default uuid_generate_v4(),
+  id uuid primary key default gen_random_uuid(),
   name text not null,
   slug text not null unique,
   description text,
@@ -41,7 +41,7 @@ create table if not exists public.brands (
 
 -- 4. Products
 create table if not exists public.products (
-  id uuid primary key default uuid_generate_v4(),
+  id uuid primary key default gen_random_uuid(),
   name text not null,
   slug text not null unique,
   sku text unique,
@@ -74,7 +74,7 @@ create index if not exists idx_products_created on public.products(created_at de
 
 -- 5. Product Images
 create table if not exists public.product_images (
-  id uuid primary key default uuid_generate_v4(),
+  id uuid primary key default gen_random_uuid(),
   product_id uuid not null references public.products(id) on delete cascade,
   image_url text not null,
   alt_text text,
@@ -117,7 +117,7 @@ create table if not exists public.business_settings (
 
 -- 7. Enquiries
 create table if not exists public.enquiries (
-  id uuid primary key default uuid_generate_v4(),
+  id uuid primary key default gen_random_uuid(),
   name text not null,
   shop_name text,
   phone text not null,
@@ -139,7 +139,7 @@ create index if not exists idx_enquiries_date on public.enquiries(created_at des
 
 -- 8. Enquiry Internal Notes (Admin only)
 create table if not exists public.enquiry_notes (
-  id uuid primary key default uuid_generate_v4(),
+  id uuid primary key default gen_random_uuid(),
   enquiry_id uuid not null references public.enquiries(id) on delete cascade,
   author_id uuid references public.profiles(id) on delete set null,
   note text not null,
@@ -150,7 +150,7 @@ create index if not exists idx_enquiry_notes_enquiry on public.enquiry_notes(enq
 
 -- 9. URL Redirect Mappings (for preserving SEO if slugs change)
 create table if not exists public.redirect_mappings (
-  id uuid primary key default uuid_generate_v4(),
+  id uuid primary key default gen_random_uuid(),
   source_path text not null unique,
   target_path text not null,
   status_code int not null default 301,
