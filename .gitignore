@@ -23,3 +23,6 @@ yarn-error.log*
 # OS Files
 .DS_Store
 *.pem
+
+# Supabase CLI temp files
+supabase/.temp/

@@ -69,4 +69,26 @@ describe('Security & Row Level Security (RLS) Policies Audit', () => {
     expect(rlsSql).toContain('create policy "Admins can upload product images"');
     expect(rlsSql).toContain('public.is_admin()');
   });
+
+  it('audits V2 migration for RLS on packaging_types and product_variants and safe referential integrity', () => {
+    const v2SqlPath = path.resolve(__dirname, '../../supabase/migrations/20261016_v2_brands_variants_packaging.sql');
+    expect(fs.existsSync(v2SqlPath)).toBe(true);
+    const v2Sql = fs.readFileSync(v2SqlPath, 'utf-8');
+
+    // RLS enabled
+    expect(v2Sql).toContain('alter table public.packaging_types enable row level security;');
+    expect(v2Sql).toContain('alter table public.product_variants enable row level security;');
+
+    // Admin mutation checks
+    expect(v2Sql).toContain('create policy "Admins can manage packaging types"');
+    expect(v2Sql).toContain('create policy "Admins can manage product variants"');
+    expect(v2Sql).toContain('create policy "Admins can manage brands"');
+
+    // Public variants strictly limited to published products
+    expect(v2Sql).toContain("p.status = 'published'");
+
+    // Referential integrity
+    expect(v2Sql).toContain('on delete restrict');
+    expect(v2Sql).toContain('on delete set null');
+  });
 });

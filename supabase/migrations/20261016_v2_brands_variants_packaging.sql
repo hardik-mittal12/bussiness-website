@@ -1,6 +1,8 @@
 -- Wholesale Footwear Database V2 Migration
 -- Brand Management, Colour Variants, and Configurable Packaging
 
+create extension if not exists "uuid-ossp";
+
 -- 1. Enhance Brands Table
 alter table public.brands add column if not exists logo_url text;
 alter table public.brands add column if not exists display_order int not null default 0;
@@ -50,7 +52,7 @@ create index if not exists idx_product_variants_product on public.product_varian
 create index if not exists idx_product_variants_active on public.product_variants(is_active);
 
 -- 4. Extend Product Images to link to Colour Variants
-alter table public.product_images add column if not exists variant_id uuid references public.product_variants(id) on delete cascade;
+alter table public.product_images add column if not exists variant_id uuid references public.product_variants(id) on delete set null;
 create index if not exists idx_product_images_variant on public.product_images(variant_id);
 
 -- 5. Extend Products Table with Packaging Configuration

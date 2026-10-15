@@ -8,9 +8,18 @@ import {
   deleteCategory, 
   submitEnquiry, 
   updateEnquiryStatus, 
-  addEnquiryNote, 
-  deleteEnquiry, 
-  updateBusinessSettings 
+  addEnquiryNote,
+  deleteEnquiry,
+  updateBusinessSettings,
+  createBrand,
+  updateBrand,
+  deleteBrand,
+  createPackagingType,
+  updatePackagingType,
+  deletePackagingType,
+  bulkUpdateProductStatus,
+  bulkAssignCategory,
+  bulkDeleteProducts
 } from '../lib/data-service';
 import { getAdminSession } from '../lib/auth';
 
@@ -120,6 +129,48 @@ describe('Fail-Closed Production Guarantees & Auth Hardening', () => {
   it('rejects business settings updates in production without Supabase connection', async () => {
     await expect(
       updateBusinessSettings({ business_name: 'Hacked Name' })
+    ).rejects.toThrow(/Persistent Supabase database connection is not configured/);
+  });
+
+  it('rejects brand mutations in production without Supabase connection', async () => {
+    await expect(
+      createBrand({ name: 'Prod Brand', slug: 'prod-brand' })
+    ).rejects.toThrow(/Persistent Supabase database connection is not configured/);
+
+    await expect(
+      updateBrand('brand-1', { name: 'New Name' })
+    ).rejects.toThrow(/Persistent Supabase database connection is not configured/);
+
+    await expect(
+      deleteBrand('brand-1')
+    ).rejects.toThrow(/Persistent Supabase database connection is not configured/);
+  });
+
+  it('rejects packaging type mutations in production without Supabase connection', async () => {
+    await expect(
+      createPackagingType({ name: 'Prod Packaging', slug: 'prod-pkg' })
+    ).rejects.toThrow(/Persistent Supabase database connection is not configured/);
+
+    await expect(
+      updatePackagingType('pkg-1', { name: 'Updated' })
+    ).rejects.toThrow(/Persistent Supabase database connection is not configured/);
+
+    await expect(
+      deletePackagingType('pkg-1')
+    ).rejects.toThrow(/Persistent Supabase database connection is not configured/);
+  });
+
+  it('rejects bulk operations in production without Supabase connection', async () => {
+    await expect(
+      bulkUpdateProductStatus(['p1', 'p2'], 'published')
+    ).rejects.toThrow(/Persistent Supabase database connection is not configured/);
+
+    await expect(
+      bulkAssignCategory(['p1'], 'cat-1')
+    ).rejects.toThrow(/Persistent Supabase database connection is not configured/);
+
+    await expect(
+      bulkDeleteProducts(['p1'])
     ).rejects.toThrow(/Persistent Supabase database connection is not configured/);
   });
 });
