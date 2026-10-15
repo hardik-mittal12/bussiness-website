@@ -12,6 +12,10 @@ export interface ProductWhatsAppParams {
   productName: string;
   sku?: string | null;
   productUrl?: string;
+  colourName?: string | null;
+  variantSku?: string | null;
+  cartonQuantity?: number | null;
+  packagingTypeName?: string | null;
 }
 
 export function generateProductWhatsAppUrl({
@@ -19,14 +23,25 @@ export function generateProductWhatsAppUrl({
   productName,
   sku,
   productUrl,
+  colourName,
+  variantSku,
+  cartonQuantity,
+  packagingTypeName,
 }: ProductWhatsAppParams): string {
   if (!phoneNumber) return '#';
   const cleanNumber = cleanPhoneNumber(phoneNumber);
   
-  let skuText = sku ? ` (Product code: ${sku})` : '';
-  let urlText = productUrl ? ` Product link: ${productUrl}` : '';
+  const skuText = sku ? ` (Product code: ${sku})` : '';
+  const colourText = colourName
+    ? ` in ${colourName}${variantSku ? ` [SKU: ${variantSku}]` : ''}`
+    : '';
+  const pkgDetails = [];
+  if (packagingTypeName) pkgDetails.push(packagingTypeName);
+  if (cartonQuantity) pkgDetails.push(`${cartonQuantity} pairs/carton`);
+  const packagingText = pkgDetails.length > 0 ? ` (${pkgDetails.join(', ')})` : '';
+  const urlText = productUrl ? ` Product link: ${productUrl}` : '';
   
-  const message = `Hello, I am interested in ${productName}${skuText}. Please share the wholesale price, available sizes, minimum order quantity, and current availability.${urlText}`;
+  const message = `Hello, I am interested in ${productName}${skuText}${colourText}${packagingText}. Please share the wholesale price, available sizes, minimum order quantity, and current availability.${urlText}`;
   
   return `https://wa.me/${cleanNumber}?text=${encodeURIComponent(message)}`;
 }

@@ -1,7 +1,7 @@
 import React from 'react';
 import { notFound } from 'next/navigation';
 import ProductForm from '@/components/admin/ProductForm';
-import { getProductById, getCategories, getBrands } from '@/lib/data-service';
+import { getProductById, getCategories, getBrands, getPackagingTypes } from '@/lib/data-service';
 
 interface EditProductPageProps {
   params: Promise<{ id: string }>;
@@ -9,10 +9,11 @@ interface EditProductPageProps {
 
 export default async function EditProductPage({ params }: EditProductPageProps) {
   const { id } = await params;
-  const [product, categories, brands] = await Promise.all([
+  const [product, categories, brands, packagingTypes] = await Promise.all([
     getProductById(id),
     getCategories(true),
-    getBrands(),
+    getBrands(true),
+    getPackagingTypes(true),
   ]);
 
   if (!product) {
@@ -24,6 +25,7 @@ export default async function EditProductPage({ params }: EditProductPageProps) 
       initialProduct={product}
       categories={categories}
       brands={brands}
+      packagingTypes={packagingTypes}
     />
   );
 }

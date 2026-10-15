@@ -22,18 +22,77 @@ export interface Brand {
   name: string;
   slug: string;
   description: string | null;
+  logo_url?: string | null;
+  display_order: number;
+  is_active: boolean;
+  product_count?: number;
   created_at: string;
+  updated_at: string;
+}
+
+export interface PackagingType {
+  id: string;
+  name: string;
+  slug: string;
+  description: string | null;
+  image_url: string | null;
+  display_order: number;
+  is_active: boolean;
+  is_default: boolean;
+  product_count?: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ProductVariant {
+  id: string;
+  product_id: string;
+  colour_name: string;
+  colour_family?: string | null;
+  hex_code?: string | null;
+  pattern?: string | null;
+  variant_sku?: string | null;
+  display_order: number;
+  is_active: boolean;
+  images?: ProductImage[];
+  created_at: string;
+  updated_at: string;
 }
 
 export interface ProductImage {
   id: string;
   product_id: string;
+  variant_id?: string | null;
   image_url: string;
   alt_text: string | null;
   display_order: number;
   is_primary: boolean;
   created_at: string;
 }
+
+export type ProductVariantInput = {
+  id?: string | null;
+  product_id?: string | null;
+  colour_name?: string;
+  colour_family?: string | null;
+  hex_code?: string | null;
+  pattern?: string | null;
+  variant_sku?: string | null;
+  display_order?: number;
+  is_active?: boolean;
+  created_at?: string;
+  updated_at?: string;
+};
+
+export type ProductImageInput = {
+  id?: string | null;
+  product_id?: string | null;
+  variant_id?: string | null;
+  image_url: string;
+  alt_text?: string | null;
+  display_order?: number;
+  is_primary?: boolean;
+};
 
 export interface Product {
   id: string;
@@ -58,6 +117,16 @@ export interface Product {
   seo_title: string | null;
   seo_description: string | null;
   images: ProductImage[];
+  variants?: ProductVariant[];
+  packaging_type_id?: string | null;
+  packaging_type?: PackagingType | null;
+  packaging_pairs_per_carton?: number | null;
+  packaging_units_per_package?: number | null;
+  carton_dimensions?: string | null;
+  carton_weight?: string | null;
+  carton_size_assortment?: string | null;
+  packaging_included_in_price?: boolean;
+  packaging_notes?: string | null;
   created_at: string;
   updated_at: string;
 }

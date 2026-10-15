@@ -1,12 +1,19 @@
 import React from 'react';
 import ProductForm from '@/components/admin/ProductForm';
-import { getCategories, getBrands } from '@/lib/data-service';
+import { getCategories, getBrands, getPackagingTypes } from '@/lib/data-service';
 
 export default async function NewProductPage() {
-  const [categories, brands] = await Promise.all([
+  const [categories, brands, packagingTypes] = await Promise.all([
     getCategories(true),
-    getBrands(),
+    getBrands(true),
+    getPackagingTypes(true),
   ]);
 
-  return <ProductForm categories={categories} brands={brands} />;
+  return (
+    <ProductForm
+      categories={categories}
+      brands={brands}
+      packagingTypes={packagingTypes}
+    />
+  );
 }

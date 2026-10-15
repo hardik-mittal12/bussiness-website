@@ -18,6 +18,20 @@ export const enquirySchema = z.object({
 
 export type EnquiryFormData = z.infer<typeof enquirySchema>;
 
+export const productVariantSchema = z.object({
+  id: z.string().optional().nullable().or(z.literal('')),
+  product_id: z.string().optional().nullable().or(z.literal('')),
+  colour_name: z.string().trim().min(1, 'Colour name is required').max(80),
+  colour_family: z.string().trim().max(50).optional().nullable().or(z.literal('')),
+  hex_code: z.string().trim().regex(/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/, 'Must be a valid hex color code (e.g. #000000)').optional().nullable().or(z.literal('')),
+  pattern: z.string().trim().max(100).optional().nullable().or(z.literal('')),
+  variant_sku: z.string().trim().max(50).optional().nullable().or(z.literal('')),
+  display_order: z.number().int().default(0),
+  is_active: z.boolean().default(true),
+});
+
+export type ProductVariantFormData = z.infer<typeof productVariantSchema>;
+
 export const productSchema = z.object({
   name: z.string().trim().min(2, 'Product name is required').max(150),
   slug: z.string().trim().min(2, 'Slug is required').max(150)
@@ -38,9 +52,43 @@ export const productSchema = z.object({
   status: z.enum(['draft', 'published', 'archived']).default('draft'),
   seo_title: z.string().trim().max(100).optional().nullable().or(z.literal('')),
   seo_description: z.string().trim().max(250).optional().nullable().or(z.literal('')),
+  variants: z.array(productVariantSchema).optional().default([]),
+  packaging_type_id: z.string().uuid().optional().nullable().or(z.literal('')),
+  packaging_pairs_per_carton: z.number().int().positive().optional().nullable(),
+  packaging_units_per_package: z.number().int().positive().optional().nullable(),
+  carton_dimensions: z.string().trim().max(100).optional().nullable().or(z.literal('')),
+  carton_weight: z.string().trim().max(50).optional().nullable().or(z.literal('')),
+  carton_size_assortment: z.string().trim().max(250).optional().nullable().or(z.literal('')),
+  packaging_included_in_price: z.boolean().default(true),
+  packaging_notes: z.string().trim().max(500).optional().nullable().or(z.literal('')),
 });
 
 export type ProductFormData = z.infer<typeof productSchema>;
+
+export const brandSchema = z.object({
+  name: z.string().trim().min(2, 'Brand name is required').max(100),
+  slug: z.string().trim().min(2, 'Slug is required').max(100)
+    .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, 'Slug must be lowercase alphanumeric with hyphens'),
+  description: z.string().trim().max(500).optional().nullable().or(z.literal('')),
+  logo_url: z.string().url('Must be a valid URL').optional().nullable().or(z.literal('')),
+  display_order: z.number().int().default(0),
+  is_active: z.boolean().default(true),
+});
+
+export type BrandFormData = z.infer<typeof brandSchema>;
+
+export const packagingTypeSchema = z.object({
+  name: z.string().trim().min(2, 'Packaging type name is required').max(100),
+  slug: z.string().trim().min(2, 'Slug is required').max(100)
+    .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, 'Slug must be lowercase alphanumeric with hyphens'),
+  description: z.string().trim().max(500).optional().nullable().or(z.literal('')),
+  image_url: z.string().url('Must be a valid URL').optional().nullable().or(z.literal('')),
+  display_order: z.number().int().default(0),
+  is_active: z.boolean().default(true),
+  is_default: z.boolean().default(false),
+});
+
+export type PackagingTypeFormData = z.infer<typeof packagingTypeSchema>;
 
 export const categorySchema = z.object({
   name: z.string().trim().min(2, 'Category name is required').max(100),

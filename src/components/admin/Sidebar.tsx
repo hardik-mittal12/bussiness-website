@@ -7,6 +7,8 @@ import {
   LayoutDashboard, 
   Package, 
   Layers, 
+  Tag,
+  Boxes,
   Inbox, 
   Settings, 
   ExternalLink,
@@ -20,6 +22,8 @@ export default function AdminSidebar() {
     { label: 'Overview', href: '/admin/dashboard', icon: LayoutDashboard },
     { label: 'Products Catalogue', href: '/admin/dashboard/products', icon: Package },
     { label: 'Categories', href: '/admin/dashboard/categories', icon: Layers },
+    { label: 'Brands & Labels', href: '/admin/dashboard/brands', icon: Tag },
+    { label: 'Packaging & Cartons', href: '/admin/dashboard/packaging', icon: Boxes },
     { label: 'Enquiries Inbox', href: '/admin/dashboard/enquiries', icon: Inbox },
     { label: 'Business & Terms', href: '/admin/dashboard/business-settings', icon: Settings },
   ];

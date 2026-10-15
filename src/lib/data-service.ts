@@ -6,14 +6,19 @@ import {
   Enquiry, 
   EnquiryStatus, 
   PublicationStatus, 
-  ProductImage 
+  ProductImage,
+  PackagingType,
+  ProductVariant,
+  ProductVariantInput,
+  ProductImageInput
 } from './types';
 import { 
   initialBusinessSettings, 
   initialCategories, 
   initialBrands, 
   initialProducts, 
-  initialEnquiries 
+  initialEnquiries,
+  initialPackagingTypes
 } from './mock-data';
 import { createServerSupabaseClient } from './supabase/server';
 
@@ -22,6 +27,7 @@ class LocalDataStore {
   businessSettings: BusinessSettings = { ...initialBusinessSettings };
   categories: Category[] = [...initialCategories];
   brands: Brand[] = [...initialBrands];
+  packagingTypes: PackagingType[] = [...initialPackagingTypes];
   products: Product[] = [...initialProducts];
   enquiries: Enquiry[] = [...initialEnquiries];
 }
@@ -105,18 +111,372 @@ export async function getCategories(includeInactive = false): Promise<Category[]
   return [...list].sort((a, b) => a.display_order - b.display_order);
 }
 
-export async function getBrands(): Promise<Brand[]> {
+export async function getBrands(includeInactive = false): Promise<Brand[]> {
   const supabase = await createServerSupabaseClient();
   if (supabase) {
-    const { data, error } = await supabase.from('brands').select('*').order('name');
+    let query = supabase.from('brands').select('*, products(id)').order('display_order', { ascending: true });
+    if (!includeInactive) {
+      query = query.eq('is_active', true);
+    }
+    const { data, error } = await query;
     if (error && isStrictProduction()) {
       throw new Error(`Failed to fetch brands: ${error.message}`);
     }
     if (!error && data) {
-      return data as Brand[];
+      return (data as Array<Brand & { products?: { id: string }[] }>).map((b) => ({
+        ...b,
+        product_count: b.products?.length || 0,
+      }));
     }
   }
-  return [...localStore.brands].sort((a, b) => a.name.localeCompare(b.name));
+
+  let list = localStore.brands;
+  if (!includeInactive) {
+    list = list.filter((b) => b.is_active);
+  }
+  return [...list]
+    .map((b) => ({
+      ...b,
+      product_count: localStore.products.filter((p) => p.brand_id === b.id).length,
+    }))
+    .sort((a, b) => a.display_order - b.display_order || a.name.localeCompare(b.name));
+}
+
+export async function getBrandById(id: string): Promise<Brand | null> {
+  const supabase = await createServerSupabaseClient();
+  if (supabase) {
+    const { data, error } = await supabase.from('brands').select('*, products(id)').eq('id', id).single();
+    if (error && error.code !== 'PGRST116' && isStrictProduction()) {
+      throw new Error(`Failed to fetch brand: ${error.message}`);
+    }
+    if (!error && data) {
+      const b = data as Brand & { products?: { id: string }[] };
+      return { ...b, product_count: b.products?.length || 0 };
+    }
+    return null;
+  }
+  const found = localStore.brands.find((b) => b.id === id);
+  if (!found) return null;
+  return {
+    ...found,
+    product_count: localStore.products.filter((p) => p.brand_id === found.id).length,
+  };
+}
+
+export async function getBrandBySlug(slug: string): Promise<Brand | null> {
+  const supabase = await createServerSupabaseClient();
+  if (supabase) {
+    const { data, error } = await supabase.from('brands').select('*, products(id)').eq('slug', slug).single();
+    if (error && error.code !== 'PGRST116' && isStrictProduction()) {
+      throw new Error(`Failed to fetch brand by slug: ${error.message}`);
+    }
+    if (!error && data) {
+      const b = data as Brand & { products?: { id: string }[] };
+      return { ...b, product_count: b.products?.length || 0 };
+    }
+    return null;
+  }
+  const found = localStore.brands.find((b) => b.slug === slug);
+  if (!found) return null;
+  return {
+    ...found,
+    product_count: localStore.products.filter((p) => p.brand_id === found.id).length,
+  };
+}
+
+export type BrandInput = {
+  name: string;
+  slug: string;
+  description?: string | null;
+  logo_url?: string | null;
+  display_order?: number;
+  is_active?: boolean;
+};
+
+export async function createBrand(brandData: BrandInput): Promise<Brand> {
+  const supabase = await createServerSupabaseClient();
+  const id = crypto.randomUUID();
+  const now = new Date().toISOString();
+
+  const newBrand: Brand = {
+    ...brandData,
+    id,
+    description: brandData.description ?? null,
+    logo_url: brandData.logo_url ?? null,
+    display_order: brandData.display_order ?? 0,
+    is_active: brandData.is_active ?? true,
+    product_count: 0,
+    created_at: now,
+    updated_at: now,
+  };
+
+  if (supabase) {
+    const { error } = await supabase.from('brands').insert({
+      id: newBrand.id,
+      name: newBrand.name,
+      slug: newBrand.slug,
+      description: newBrand.description,
+      logo_url: newBrand.logo_url,
+      display_order: newBrand.display_order,
+      is_active: newBrand.is_active,
+    });
+    if (error) throw new Error(`Brand creation failed: ${error.message}`);
+    return newBrand;
+  }
+
+  if (isStrictProduction()) {
+    throw new Error('Database write rejected: Persistent Supabase database connection is not configured or unavailable in production.');
+  }
+
+  localStore.brands.push(newBrand);
+  return newBrand;
+}
+
+export async function updateBrand(id: string, updates: Partial<Brand>): Promise<Brand> {
+  const supabase = await createServerSupabaseClient();
+  const now = new Date().toISOString();
+
+  if (supabase) {
+    const { error } = await supabase
+      .from('brands')
+      .update({ ...updates, updated_at: now })
+      .eq('id', id);
+    if (error) throw new Error(`Brand update failed: ${error.message}`);
+    const brand = await getBrandById(id);
+    if (!brand) throw new Error('Brand not found');
+    return brand;
+  }
+
+  if (isStrictProduction()) {
+    throw new Error('Database write rejected: Persistent Supabase database connection is not configured or unavailable in production.');
+  }
+
+  const idx = localStore.brands.findIndex((b) => b.id === id);
+  if (idx === -1) throw new Error('Brand not found');
+  localStore.brands[idx] = {
+    ...localStore.brands[idx],
+    ...updates,
+    updated_at: now,
+  };
+  return {
+    ...localStore.brands[idx],
+    product_count: localStore.products.filter((p) => p.brand_id === id).length,
+  };
+}
+
+export async function deleteBrand(id: string): Promise<{ success: boolean; error?: string }> {
+  const supabase = await createServerSupabaseClient();
+  if (supabase) {
+    const { count, error: countError } = await supabase
+      .from('products')
+      .select('id', { count: 'exact', head: true })
+      .eq('brand_id', id);
+
+    if (countError && isStrictProduction()) {
+      throw new Error(`Failed to verify products referencing brand: ${countError.message}`);
+    }
+
+    if (!countError && typeof count === 'number' && count > 0) {
+      return {
+        success: false,
+        error: `Cannot delete brand: ${count} product(s) are currently assigned to this brand. Please reassign or delete them first, or deactivate the brand.`,
+      };
+    }
+
+    const { error } = await supabase.from('brands').delete().eq('id', id);
+    if (error) return { success: false, error: error.message };
+    return { success: true };
+  }
+
+  if (isStrictProduction()) {
+    throw new Error('Database write rejected: Persistent Supabase database connection is not configured or unavailable in production.');
+  }
+
+  const productsUsingBrand = localStore.products.filter((p) => p.brand_id === id);
+  if (productsUsingBrand.length > 0) {
+    return {
+      success: false,
+      error: `Cannot delete brand: ${productsUsingBrand.length} product(s) are currently assigned to this brand. Please reassign or delete them first, or deactivate the brand.`,
+    };
+  }
+
+  localStore.brands = localStore.brands.filter((b) => b.id !== id);
+  return { success: true };
+}
+
+export async function getPackagingTypes(includeInactive = false): Promise<PackagingType[]> {
+  const supabase = await createServerSupabaseClient();
+  if (supabase) {
+    let query = supabase.from('packaging_types').select('*, products(id)').order('display_order', { ascending: true });
+    if (!includeInactive) {
+      query = query.eq('is_active', true);
+    }
+    const { data, error } = await query;
+    if (error && isStrictProduction()) {
+      throw new Error(`Failed to fetch packaging types: ${error.message}`);
+    }
+    if (!error && data) {
+      return (data as Array<PackagingType & { products?: { id: string }[] }>).map((pt) => ({
+        ...pt,
+        product_count: pt.products?.length || 0,
+      }));
+    }
+  }
+
+  let list = localStore.packagingTypes;
+  if (!includeInactive) {
+    list = list.filter((p) => p.is_active);
+  }
+  return [...list]
+    .map((pt) => ({
+      ...pt,
+      product_count: localStore.products.filter((p) => p.packaging_type_id === pt.id).length,
+    }))
+    .sort((a, b) => a.display_order - b.display_order);
+}
+
+export async function getPackagingTypeById(id: string): Promise<PackagingType | null> {
+  const supabase = await createServerSupabaseClient();
+  if (supabase) {
+    const { data, error } = await supabase.from('packaging_types').select('*, products(id)').eq('id', id).single();
+    if (error && error.code !== 'PGRST116' && isStrictProduction()) {
+      throw new Error(`Failed to fetch packaging type: ${error.message}`);
+    }
+    if (!error && data) {
+      const pt = data as PackagingType & { products?: { id: string }[] };
+      return { ...pt, product_count: pt.products?.length || 0 };
+    }
+    return null;
+  }
+  const found = localStore.packagingTypes.find((p) => p.id === id);
+  if (!found) return null;
+  return {
+    ...found,
+    product_count: localStore.products.filter((p) => p.packaging_type_id === found.id).length,
+  };
+}
+
+export type PackagingTypeInput = {
+  name: string;
+  slug: string;
+  description?: string | null;
+  image_url?: string | null;
+  display_order?: number;
+  is_active?: boolean;
+  is_default?: boolean;
+};
+
+export async function createPackagingType(data: PackagingTypeInput): Promise<PackagingType> {
+  const supabase = await createServerSupabaseClient();
+  const id = crypto.randomUUID();
+  const now = new Date().toISOString();
+
+  const newPkg: PackagingType = {
+    ...data,
+    id,
+    description: data.description ?? null,
+    image_url: data.image_url ?? null,
+    display_order: data.display_order ?? 0,
+    is_active: data.is_active ?? true,
+    is_default: data.is_default ?? false,
+    product_count: 0,
+    created_at: now,
+    updated_at: now,
+  };
+
+  if (supabase) {
+    const { error } = await supabase.from('packaging_types').insert({
+      id: newPkg.id,
+      name: newPkg.name,
+      slug: newPkg.slug,
+      description: newPkg.description,
+      image_url: newPkg.image_url,
+      display_order: newPkg.display_order,
+      is_active: newPkg.is_active,
+      is_default: newPkg.is_default,
+    });
+    if (error) throw new Error(`Packaging type creation failed: ${error.message}`);
+    return newPkg;
+  }
+
+  if (isStrictProduction()) {
+    throw new Error('Database write rejected: Persistent Supabase database connection is not configured or unavailable in production.');
+  }
+
+  localStore.packagingTypes.push(newPkg);
+  return newPkg;
+}
+
+export async function updatePackagingType(id: string, updates: Partial<PackagingType>): Promise<PackagingType> {
+  const supabase = await createServerSupabaseClient();
+  const now = new Date().toISOString();
+
+  if (supabase) {
+    const { error } = await supabase
+      .from('packaging_types')
+      .update({ ...updates, updated_at: now })
+      .eq('id', id);
+    if (error) throw new Error(`Packaging type update failed: ${error.message}`);
+    const pt = await getPackagingTypeById(id);
+    if (!pt) throw new Error('Packaging type not found');
+    return pt;
+  }
+
+  if (isStrictProduction()) {
+    throw new Error('Database write rejected: Persistent Supabase database connection is not configured or unavailable in production.');
+  }
+
+  const idx = localStore.packagingTypes.findIndex((p) => p.id === id);
+  if (idx === -1) throw new Error('Packaging type not found');
+  localStore.packagingTypes[idx] = {
+    ...localStore.packagingTypes[idx],
+    ...updates,
+    updated_at: now,
+  };
+  return {
+    ...localStore.packagingTypes[idx],
+    product_count: localStore.products.filter((p) => p.packaging_type_id === id).length,
+  };
+}
+
+export async function deletePackagingType(id: string): Promise<{ success: boolean; error?: string }> {
+  const supabase = await createServerSupabaseClient();
+  if (supabase) {
+    const { count, error: countError } = await supabase
+      .from('products')
+      .select('id', { count: 'exact', head: true })
+      .eq('packaging_type_id', id);
+
+    if (countError && isStrictProduction()) {
+      throw new Error(`Failed to check products referencing packaging type: ${countError.message}`);
+    }
+
+    if (!countError && typeof count === 'number' && count > 0) {
+      return {
+        success: false,
+        error: `Cannot delete packaging type: ${count} product(s) are currently configured with this packaging type. Please reassign or update them first.`,
+      };
+    }
+
+    const { error } = await supabase.from('packaging_types').delete().eq('id', id);
+    if (error) return { success: false, error: error.message };
+    return { success: true };
+  }
+
+  if (isStrictProduction()) {
+    throw new Error('Database write rejected: Persistent Supabase database connection is not configured or unavailable in production.');
+  }
+
+  const productsUsingPkg = localStore.products.filter((p) => p.packaging_type_id === id);
+  if (productsUsingPkg.length > 0) {
+    return {
+      success: false,
+      error: `Cannot delete packaging type: ${productsUsingPkg.length} product(s) are currently configured with this packaging type. Please reassign or update them first.`,
+    };
+  }
+
+  localStore.packagingTypes = localStore.packagingTypes.filter((p) => p.id !== id);
+  return { success: true };
 }
 
 export interface GetProductsParams {
@@ -155,7 +515,9 @@ export async function getProducts({
         *,
         category:categories(*),
         brand:brands(*),
-        images:product_images(*)
+        images:product_images(*),
+        variants:product_variants(*),
+        packaging_type:packaging_types(*)
       `, { count: 'exact' });
 
     if (status !== 'all') {
@@ -285,6 +647,8 @@ export async function getProducts({
     ...p,
     category: localStore.categories.find((c) => c.id === p.category_id) || null,
     brand: localStore.brands.find((b) => b.id === p.brand_id) || null,
+    packaging_type: localStore.packagingTypes.find((pt) => pt.id === p.packaging_type_id) || null,
+    variants: p.variants || [],
   }));
 
   return {
@@ -304,7 +668,9 @@ export async function getProductBySlug(slug: string, includeUnpublished = false)
         *,
         category:categories(*),
         brand:brands(*),
-        images:product_images(*)
+        images:product_images(*),
+        variants:product_variants(*),
+        packaging_type:packaging_types(*)
       `)
       .eq('slug', slug);
 
@@ -332,6 +698,8 @@ export async function getProductBySlug(slug: string, includeUnpublished = false)
     ...p,
     category: localStore.categories.find((c) => c.id === p.category_id) || null,
     brand: localStore.brands.find((b) => b.id === p.brand_id) || null,
+    packaging_type: localStore.packagingTypes.find((pt) => pt.id === p.packaging_type_id) || null,
+    variants: p.variants || [],
   };
 }
 
@@ -344,7 +712,9 @@ export async function getProductById(id: string): Promise<Product | null> {
         *,
         category:categories(*),
         brand:brands(*),
-        images:product_images(*)
+        images:product_images(*),
+        variants:product_variants(*),
+        packaging_type:packaging_types(*)
       `)
       .eq('id', id)
       .single();
@@ -363,13 +733,45 @@ export async function getProductById(id: string): Promise<Product | null> {
     ...p,
     category: localStore.categories.find((c) => c.id === p.category_id) || null,
     brand: localStore.brands.find((b) => b.id === p.brand_id) || null,
+    packaging_type: localStore.packagingTypes.find((pt) => pt.id === p.packaging_type_id) || null,
+    variants: p.variants || [],
   };
 }
 
-export async function createProduct(productData: Partial<Product> & { images?: Partial<ProductImage>[] }): Promise<Product> {
+export type ProductInput = Omit<Partial<Product>, 'images' | 'variants'> & {
+  images?: ProductImageInput[];
+  variants?: ProductVariantInput[];
+};
+
+export async function createProduct(productData: ProductInput): Promise<Product> {
   const supabase = await createServerSupabaseClient();
   const id = crypto.randomUUID();
   const now = new Date().toISOString();
+
+  const variants: ProductVariant[] = (productData.variants || []).map((v, idx) => ({
+    id: v.id || crypto.randomUUID(),
+    product_id: id,
+    colour_name: v.colour_name || 'Standard',
+    colour_family: v.colour_family || null,
+    hex_code: v.hex_code || null,
+    pattern: v.pattern || null,
+    variant_sku: v.variant_sku || null,
+    display_order: v.display_order ?? idx,
+    is_active: v.is_active ?? true,
+    created_at: now,
+    updated_at: now,
+  }));
+
+  const images: ProductImage[] = (productData.images || []).map((img, idx) => ({
+    id: img.id || crypto.randomUUID(),
+    product_id: id,
+    variant_id: img.variant_id || null,
+    image_url: img.image_url || 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=800&q=80',
+    alt_text: img.alt_text || productData.name || 'Product Image',
+    display_order: img.display_order ?? idx,
+    is_primary: img.is_primary ?? idx === 0,
+    created_at: now,
+  }));
 
   const newProduct: Product = {
     id,
@@ -389,17 +791,18 @@ export async function createProduct(productData: Partial<Product> & { images?: P
     availability_status: productData.availability_status || 'in_stock',
     is_featured: productData.is_featured || false,
     status: productData.status || 'draft',
+    packaging_type_id: productData.packaging_type_id || null,
+    packaging_units_per_package: productData.packaging_units_per_package ?? 1,
+    packaging_pairs_per_carton: productData.packaging_pairs_per_carton ?? null,
+    carton_dimensions: productData.carton_dimensions || null,
+    carton_weight: productData.carton_weight || null,
+    carton_size_assortment: productData.carton_size_assortment || null,
+    packaging_included_in_price: productData.packaging_included_in_price ?? true,
+    packaging_notes: productData.packaging_notes || null,
     seo_title: productData.seo_title || null,
     seo_description: productData.seo_description || null,
-    images: (productData.images || []).map((img, idx) => ({
-      id: img.id || crypto.randomUUID(),
-      product_id: id,
-      image_url: img.image_url || 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=800&q=80',
-      alt_text: img.alt_text || productData.name || 'Product Image',
-      display_order: img.display_order ?? idx,
-      is_primary: img.is_primary ?? idx === 0,
-      created_at: now,
-    })),
+    images,
+    variants,
     created_at: now,
     updated_at: now,
   };
@@ -423,6 +826,14 @@ export async function createProduct(productData: Partial<Product> & { images?: P
       availability_status: newProduct.availability_status,
       is_featured: newProduct.is_featured,
       status: newProduct.status,
+      packaging_type_id: newProduct.packaging_type_id,
+      packaging_units_per_package: newProduct.packaging_units_per_package,
+      packaging_pairs_per_carton: newProduct.packaging_pairs_per_carton,
+      carton_dimensions: newProduct.carton_dimensions,
+      carton_weight: newProduct.carton_weight,
+      carton_size_assortment: newProduct.carton_size_assortment,
+      packaging_included_in_price: newProduct.packaging_included_in_price,
+      packaging_notes: newProduct.packaging_notes,
       seo_title: newProduct.seo_title,
       seo_description: newProduct.seo_description,
     });
@@ -430,8 +841,12 @@ export async function createProduct(productData: Partial<Product> & { images?: P
       throw new Error(`Failed to create product in Supabase: ${error.message}`);
     }
 
-    if (newProduct.images.length > 0) {
-      await supabase.from('product_images').insert(newProduct.images);
+    if (variants.length > 0) {
+      await supabase.from('product_variants').insert(variants);
+    }
+
+    if (images.length > 0) {
+      await supabase.from('product_images').insert(images);
     }
     return newProduct;
   }
@@ -444,25 +859,47 @@ export async function createProduct(productData: Partial<Product> & { images?: P
   return newProduct;
 }
 
-export async function updateProduct(id: string, updates: Partial<Product> & { images?: Partial<ProductImage>[] }): Promise<Product> {
+export async function updateProduct(id: string, updates: ProductInput): Promise<Product> {
   const supabase = await createServerSupabaseClient();
   const now = new Date().toISOString();
 
   if (supabase) {
-    const { images, ...productFields } = updates;
+    const { images, variants, category, brand, packaging_type, ...productFields } = updates;
     const { error } = await supabase
       .from('products')
       .update({ ...productFields, updated_at: now })
       .eq('id', id);
     if (error) throw new Error(`Supabase error: ${error.message}`);
 
-    if (images) {
+    if (variants !== undefined) {
+      await supabase.from('product_variants').delete().eq('product_id', id);
+      if (variants.length > 0) {
+        await supabase.from('product_variants').insert(
+          variants.map((v, idx) => ({
+            id: v.id || crypto.randomUUID(),
+            product_id: id,
+            colour_name: v.colour_name || 'Standard',
+            colour_family: v.colour_family || null,
+            hex_code: v.hex_code || null,
+            pattern: v.pattern || null,
+            variant_sku: v.variant_sku || null,
+            display_order: v.display_order ?? idx,
+            is_active: v.is_active ?? true,
+            created_at: now,
+            updated_at: now,
+          }))
+        );
+      }
+    }
+
+    if (images !== undefined) {
       await supabase.from('product_images').delete().eq('product_id', id);
       if (images.length > 0) {
         await supabase.from('product_images').insert(
           images.map((img, idx) => ({
             id: img.id || crypto.randomUUID(),
             product_id: id,
+            variant_id: img.variant_id || null,
             image_url: img.image_url!,
             alt_text: img.alt_text || '',
             display_order: img.display_order ?? idx,
@@ -472,6 +909,7 @@ export async function updateProduct(id: string, updates: Partial<Product> & { im
         );
       }
     }
+
     const updated = await getProductById(id);
     if (!updated) throw new Error('Product not found after update');
     return updated;
@@ -485,10 +923,28 @@ export async function updateProduct(id: string, updates: Partial<Product> & { im
   if (idx === -1) throw new Error('Product not found');
 
   const existing = localStore.products[idx];
-  const updatedImages: ProductImage[] = updates.images
+
+  const updatedVariants: ProductVariant[] = updates.variants !== undefined
+    ? updates.variants.map((v, i) => ({
+        id: v.id || crypto.randomUUID(),
+        product_id: id,
+        colour_name: v.colour_name || 'Standard',
+        colour_family: v.colour_family || null,
+        hex_code: v.hex_code || null,
+        pattern: v.pattern || null,
+        variant_sku: v.variant_sku || null,
+        display_order: v.display_order ?? i,
+        is_active: v.is_active ?? true,
+        created_at: v.created_at || now,
+        updated_at: now,
+      }))
+    : existing.variants || [];
+
+  const updatedImages: ProductImage[] = updates.images !== undefined
     ? updates.images.map((img, i) => ({
         id: img.id || crypto.randomUUID(),
         product_id: id,
+        variant_id: img.variant_id || null,
         image_url: img.image_url || existing.images[0]?.image_url || '',
         alt_text: img.alt_text || '',
         display_order: img.display_order ?? i,
@@ -497,10 +953,13 @@ export async function updateProduct(id: string, updates: Partial<Product> & { im
       }))
     : existing.images;
 
+  const { category, brand, packaging_type, ...cleanUpdates } = updates;
+
   const updated: Product = {
     ...existing,
-    ...updates,
+    ...cleanUpdates,
     images: updatedImages,
+    variants: updatedVariants,
     updated_at: now,
   };
 
@@ -524,6 +983,147 @@ export async function deleteProduct(id: string): Promise<boolean> {
   localStore.products = localStore.products.filter((p) => p.id !== id);
   return localStore.products.length < initialLen;
 }
+
+export async function duplicateProduct(id: string): Promise<Product> {
+  const original = await getProductById(id);
+  if (!original) throw new Error('Source product not found for duplication');
+
+  const timestamp = Date.now();
+  const duplicatedData: ProductInput = {
+    name: `${original.name} (Copy)`,
+    slug: `${original.slug}-copy-${timestamp}`,
+    sku: original.sku ? `${original.sku}-COPY` : null,
+    category_id: original.category_id,
+    brand_id: original.brand_id,
+    short_description: original.short_description,
+    description: original.description,
+    material: original.material,
+    available_sizes: [...(original.available_sizes || [])],
+    color: original.color,
+    wholesale_price: original.wholesale_price,
+    price_visibility: original.price_visibility,
+    moq: original.moq,
+    availability_status: original.availability_status,
+    is_featured: false,
+    status: 'draft',
+    packaging_type_id: original.packaging_type_id,
+    packaging_units_per_package: original.packaging_units_per_package,
+    packaging_pairs_per_carton: original.packaging_pairs_per_carton,
+    carton_dimensions: original.carton_dimensions,
+    carton_weight: original.carton_weight,
+    carton_size_assortment: original.carton_size_assortment,
+    packaging_included_in_price: original.packaging_included_in_price,
+    packaging_notes: original.packaging_notes,
+    seo_title: original.seo_title,
+    seo_description: original.seo_description,
+    images: (original.images || []).map((img) => ({
+      image_url: img.image_url,
+      alt_text: img.alt_text,
+      display_order: img.display_order,
+      is_primary: img.is_primary,
+      variant_id: img.variant_id,
+    })),
+    variants: (original.variants || []).map((v) => ({
+      colour_name: v.colour_name,
+      colour_family: v.colour_family,
+      hex_code: v.hex_code,
+      pattern: v.pattern,
+      variant_sku: v.variant_sku ? `${v.variant_sku}-COPY` : null,
+      display_order: v.display_order,
+      is_active: v.is_active,
+    })),
+  };
+
+  return createProduct(duplicatedData);
+}
+
+export async function bulkUpdateProductStatus(
+  ids: string[],
+  status: PublicationStatus
+): Promise<{ updatedCount: number }> {
+  if (ids.length === 0) return { updatedCount: 0 };
+  const supabase = await createServerSupabaseClient();
+  const now = new Date().toISOString();
+
+  if (supabase) {
+    const { error, count } = await supabase
+      .from('products')
+      .update({ status, updated_at: now })
+      .in('id', ids);
+    if (error) throw new Error(`Bulk status update failed: ${error.message}`);
+    return { updatedCount: count ?? ids.length };
+  }
+
+  if (isStrictProduction()) {
+    throw new Error('Database write rejected: Persistent Supabase database connection is not configured or unavailable in production.');
+  }
+
+  let updated = 0;
+  localStore.products.forEach((p) => {
+    if (ids.includes(p.id)) {
+      p.status = status;
+      p.updated_at = now;
+      updated++;
+    }
+  });
+  return { updatedCount: updated };
+}
+
+export async function bulkAssignCategory(
+  ids: string[],
+  categoryId: string | null
+): Promise<{ updatedCount: number }> {
+  if (ids.length === 0) return { updatedCount: 0 };
+  const supabase = await createServerSupabaseClient();
+  const now = new Date().toISOString();
+
+  if (supabase) {
+    const { error, count } = await supabase
+      .from('products')
+      .update({ category_id: categoryId, updated_at: now })
+      .in('id', ids);
+    if (error) throw new Error(`Bulk category assignment failed: ${error.message}`);
+    return { updatedCount: count ?? ids.length };
+  }
+
+  if (isStrictProduction()) {
+    throw new Error('Database write rejected: Persistent Supabase database connection is not configured or unavailable in production.');
+  }
+
+  let updated = 0;
+  localStore.products.forEach((p) => {
+    if (ids.includes(p.id)) {
+      p.category_id = categoryId;
+      p.updated_at = now;
+      updated++;
+    }
+  });
+  return { updatedCount: updated };
+}
+
+export async function bulkDeleteProducts(ids: string[]): Promise<{ deletedCount: number }> {
+  if (ids.length === 0) return { deletedCount: 0 };
+  const supabase = await createServerSupabaseClient();
+
+  if (supabase) {
+    const { error, count } = await supabase
+      .from('products')
+      .delete()
+      .in('id', ids);
+    if (error) throw new Error(`Bulk delete failed: ${error.message}`);
+    return { deletedCount: count ?? ids.length };
+  }
+
+  if (isStrictProduction()) {
+    throw new Error('Database write rejected: Persistent Supabase database connection is not configured or unavailable in production.');
+  }
+
+  const before = localStore.products.length;
+  localStore.products = localStore.products.filter((p) => !ids.includes(p.id));
+  return { deletedCount: before - localStore.products.length };
+}
+
+export { computeProductCompleteness, type ProductCompleteness } from './completeness';
 
 export async function createCategory(cat: Omit<Category, 'id' | 'created_at' | 'updated_at'>): Promise<Category> {
   const supabase = await createServerSupabaseClient();
