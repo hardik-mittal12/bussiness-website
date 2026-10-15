@@ -77,32 +77,37 @@ drop policy if exists "Anyone can view brands" on public.brands;
 drop policy if exists "Anyone can view active brands" on public.brands;
 create policy "Anyone can view active brands"
   on public.brands for select
-  using (is_active = true or is_admin());
+  to anon, authenticated
+  using (is_active = true or public.is_admin());
 
 drop policy if exists "Admins can manage brands" on public.brands;
 create policy "Admins can manage brands"
   on public.brands for all
-  using (is_admin())
-  with check (is_admin());
+  to authenticated
+  using (public.is_admin())
+  with check (public.is_admin());
 
 -- Packaging Types RLS
 drop policy if exists "Anyone can view active packaging types" on public.packaging_types;
 create policy "Anyone can view active packaging types"
   on public.packaging_types for select
-  using (is_active = true or is_admin());
+  to anon, authenticated
+  using (is_active = true or public.is_admin());
 
 drop policy if exists "Admins can manage packaging types" on public.packaging_types;
 create policy "Admins can manage packaging types"
   on public.packaging_types for all
-  using (is_admin())
-  with check (is_admin());
+  to authenticated
+  using (public.is_admin())
+  with check (public.is_admin());
 
 -- Product Variants RLS
 drop policy if exists "Anyone can view active variants of published products" on public.product_variants;
 create policy "Anyone can view active variants of published products"
   on public.product_variants for select
+  to anon, authenticated
   using (
-    is_admin() or (
+    public.is_admin() or (
       is_active = true and exists (
         select 1 from public.products p
         where p.id = product_variants.product_id and p.status = 'published'
@@ -113,8 +118,19 @@ create policy "Anyone can view active variants of published products"
 drop policy if exists "Admins can manage product variants" on public.product_variants;
 create policy "Admins can manage product variants"
   on public.product_variants for all
-  using (is_admin())
-  with check (is_admin());
+  to authenticated
+  using (public.is_admin())
+  with check (public.is_admin());
+
+-- Least-Privilege Role Grants
+grant select on public.brands to anon, authenticated;
+grant all on public.brands to authenticated;
+
+grant select on public.packaging_types to anon, authenticated;
+grant all on public.packaging_types to authenticated;
+
+grant select on public.product_variants to anon, authenticated;
+grant all on public.product_variants to authenticated;
 
 -- 7. Seed Initial Packaging Types if none exist
 insert into public.packaging_types (id, name, slug, description, display_order, is_active, is_default)
