@@ -42,6 +42,13 @@ export async function generateMetadata(): Promise<Metadata> {
       index: true,
       follow: true,
     },
+    icons: {
+      icon: [
+        { url: '/icon.svg', type: 'image/svg+xml' },
+      ],
+      shortcut: '/icon.svg',
+      apple: '/icon.svg',
+    },
   };
 }
 
@@ -85,6 +92,7 @@ export default async function RootLayout({
           businessName={settings.business_name}
           phone={settings.phone}
           whatsappNumber={settings.whatsapp_number}
+          logoUrl={settings.logo_url}
         />
         <main className="flex-1">{children}</main>
         <Footer settings={settings} />

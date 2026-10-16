@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import { Menu, X, Phone, MessageCircle } from 'lucide-react';
 import { generateGeneralWhatsAppUrl } from '@/lib/whatsapp';
@@ -10,15 +11,25 @@ interface NavbarProps {
   businessName?: string;
   phone?: string | null;
   whatsappNumber?: string | null;
+  logoUrl?: string | null;
 }
 
 export default function Navbar({
-  businessName = 'Apex Footwear',
+  businessName = 'Shiv Ganga Traders',
   phone,
   whatsappNumber,
+  logoUrl,
 }: NavbarProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const pathname = usePathname();
+
+  const initials = businessName
+    .split(' ')
+    .filter(Boolean)
+    .map((w) => w[0])
+    .slice(0, 2)
+    .join('')
+    .toUpperCase() || 'SG';
 
   const navLinks = [
     { label: 'Home', href: '/' },
@@ -37,9 +48,20 @@ export default function Navbar({
           {/* Logo / Brand Name */}
           <div className="flex items-center">
             <Link href="/" className="flex items-center space-x-3 group">
-              <div className="w-10 h-10 rounded-lg bg-blue-950 flex items-center justify-center text-amber-400 font-bold text-xl shadow-xs group-hover:bg-blue-900 transition-colors">
-                AF
-              </div>
+              {logoUrl ? (
+                <div className="w-10 h-10 rounded-lg overflow-hidden relative border border-slate-200 bg-white shadow-2xs shrink-0">
+                  <Image
+                    src={logoUrl}
+                    alt={businessName}
+                    fill
+                    className="object-contain p-1"
+                  />
+                </div>
+              ) : (
+                <div className="w-10 h-10 rounded-lg bg-blue-950 flex items-center justify-center text-amber-400 font-bold text-lg shadow-2xs group-hover:bg-blue-900 transition-colors shrink-0">
+                  {initials}
+                </div>
+              )}
               <div>
                 <span className="font-bold text-xl tracking-tight text-blue-950 block">
                   {businessName}
