@@ -13,7 +13,9 @@ import {
   X, 
   Check, 
   Eye, 
-  EyeOff 
+  EyeOff,
+  Upload,
+  ImageIcon
 } from 'lucide-react';
 import { Category } from '@/lib/types';
 
@@ -25,6 +27,7 @@ export default function AdminCategoriesPage() {
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
+  const [uploadingImage, setUploadingImage] = useState(false);
   const [modalFormData, setModalFormData] = useState({
     name: '',
     slug: '',
@@ -85,6 +88,33 @@ export default function AdminCategoriesPage() {
       name: val,
       slug: editingCategory ? prev.slug : val.toLowerCase().trim().replace(/[^\w\s-]/g, '').replace(/[\s_-]+/g, '-'),
     }));
+  };
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setUploadingImage(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      const res = await fetch('/api/admin/upload', {
+        method: 'POST',
+        body: formData,
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Upload failed');
+      setModalFormData((prev) => ({ ...prev, image_url: data.url }));
+      setNotification({ type: 'success', message: 'Category image uploaded successfully' });
+    } catch (err: unknown) {
+      setNotification({
+        type: 'error',
+        message: err instanceof Error ? err.message : 'Image upload failed',
+      });
+    } finally {
+      setUploadingImage(false);
+      e.target.value = '';
+    }
   };
 
   const handleModalSubmit = async (e: React.FormEvent) => {
@@ -373,15 +403,71 @@ export default function AdminCategoriesPage() {
 
               <div>
                 <label className="block font-semibold text-slate-700 uppercase tracking-wider mb-1">
-                  Category Image URL
+                  Category Image
                 </label>
-                <input
-                  type="url"
-                  value={modalFormData.image_url}
-                  onChange={(e) => setModalFormData({ ...modalFormData, image_url: e.target.value })}
-                  placeholder="https://..."
-                  className="w-full px-3 py-2 rounded-lg border border-slate-300 focus:outline-hidden focus:ring-2 focus:ring-blue-950"
-                />
+
+                {modalFormData.image_url && (
+                  <div className="flex items-center space-x-3 mb-2 p-2 bg-slate-50 border border-slate-200 rounded-lg">
+                    <div className="w-12 h-12 rounded-md bg-white border border-slate-200 overflow-hidden relative shrink-0">
+                      <Image
+                        src={modalFormData.image_url}
+                        alt="Preview"
+                        fill
+                        className="object-cover"
+                      />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <span className="text-[11px] font-mono text-slate-500 truncate block">
+                        {modalFormData.image_url}
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setModalFormData({ ...modalFormData, image_url: '' })}
+                      className="text-rose-600 hover:text-rose-800 p-1 hover:bg-rose-50 rounded text-xs font-semibold shrink-0"
+                      title="Remove image"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                )}
+
+                <div className="space-y-1.5">
+                  <div className="flex items-center gap-2">
+                    <label className="inline-flex items-center px-3 py-1.5 bg-blue-950 hover:bg-blue-900 text-white text-xs font-semibold rounded-lg cursor-pointer transition-colors shadow-2xs">
+                      {uploadingImage ? (
+                        <>
+                          <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+                          Uploading...
+                        </>
+                      ) : (
+                        <>
+                          <Upload className="w-3.5 h-3.5 mr-1.5" />
+                          Upload Category Photo
+                        </>
+                      )}
+                      <input
+                        type="file"
+                        accept="image/jpeg,image/png,image/webp,image/avif"
+                        onChange={handleFileUpload}
+                        className="hidden"
+                        disabled={uploadingImage}
+                      />
+                    </label>
+                    <span className="text-[11px] text-slate-400">or enter image URL below</span>
+                  </div>
+
+                  <input
+                    type="url"
+                    value={modalFormData.image_url}
+                    onChange={(e) => setModalFormData({ ...modalFormData, image_url: e.target.value })}
+                    placeholder="https://... or upload photo above"
+                    className="w-full px-3 py-2 font-mono text-xs rounded-lg border border-slate-300 focus:outline-hidden focus:ring-2 focus:ring-blue-950"
+                  />
+                  <p className="text-[10px] text-slate-400">
+                    Supports JPEG, PNG, WebP, AVIF up to 5 MB, or any valid image URL.
+                  </p>
+                </div>
               </div>
 
               <div className="grid grid-cols-2 gap-3">

@@ -473,7 +473,7 @@ export default function AdminBrandsPage() {
                 </label>
                 <div className="flex items-center space-x-3">
                   {modalFormData.logo_url && (
-                    <div className="w-12 h-12 rounded-lg border border-slate-200 p-1 shrink-0 bg-slate-50 flex items-center justify-center">
+                    <div className="relative group w-12 h-12 rounded-lg border border-slate-200 p-1 shrink-0 bg-slate-50 flex items-center justify-center">
                       <Image
                         src={modalFormData.logo_url}
                         alt="Logo Preview"
@@ -481,6 +481,14 @@ export default function AdminBrandsPage() {
                         height={40}
                         className="object-contain max-h-full"
                       />
+                      <button
+                        type="button"
+                        onClick={() => setModalFormData({ ...modalFormData, logo_url: '' })}
+                        className="absolute -top-1.5 -right-1.5 bg-rose-500 hover:bg-rose-600 text-white p-0.5 rounded-full shadow-xs"
+                        title="Remove Logo"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
                     </div>
                   )}
                   <div className="flex-1">
