@@ -15,6 +15,9 @@ import { getBusinessSettings, getCategories, getProducts } from '@/lib/data-serv
 import ProductCard from '@/components/ProductCard';
 import { generateGeneralWhatsAppUrl } from '@/lib/whatsapp';
 
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 export default async function HomePage() {
   const settings = await getBusinessSettings();
   const categories = await getCategories(false);

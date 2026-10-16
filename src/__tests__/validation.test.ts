@@ -115,4 +115,25 @@ describe('Validation Schemas', () => {
       expect(result.success).toBe(true);
     });
   });
+
+  describe('Business Settings Schema', () => {
+    it('validates business settings and preserves hero_image_url and location fields', () => {
+      const valid = {
+        business_name: 'Shiv Ganga Traders',
+        city: 'Chandigarh',
+        state: 'Chandigarh',
+        pincode: '160047',
+        hero_headline: 'Direct Wholesale Footwear Supply',
+        hero_image_url: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff',
+      };
+
+      const result = businessSettingsSchema.partial().safeParse(valid);
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data.hero_image_url).toBe('https://images.unsplash.com/photo-1542291026-7eec264c27ff');
+        expect(result.data.state).toBe('Chandigarh');
+        expect(result.data.pincode).toBe('160047');
+      }
+    });
+  });
 });

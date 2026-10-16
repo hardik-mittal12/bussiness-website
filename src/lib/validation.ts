@@ -116,6 +116,7 @@ export const businessSettingsSchema = z.object({
   service_areas: z.array(z.string()).default([]),
   hero_headline: z.string().trim().max(150).optional().nullable().or(z.literal('')),
   hero_subheadline: z.string().trim().max(300).optional().nullable().or(z.literal('')),
+  hero_image_url: z.string().trim().optional().nullable().or(z.literal('')),
   about_intro: z.string().trim().max(1000).optional().nullable().or(z.literal('')),
   about_history: z.string().trim().max(2000).optional().nullable().or(z.literal('')),
   wholesale_terms: z.string().trim().max(2000).optional().nullable().or(z.literal('')),

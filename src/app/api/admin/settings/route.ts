@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { revalidatePath } from 'next/cache';
 import { getAdminSession } from '@/lib/auth';
 import { getBusinessSettings, updateBusinessSettings } from '@/lib/data-service';
 import { businessSettingsSchema } from '@/lib/validation';
@@ -30,6 +31,15 @@ export async function PUT(req: NextRequest) {
     }
 
     const updated = await updateBusinessSettings(parseResult.data);
+    
+    // Purge cached HTML across homepage and root layout so new settings render immediately
+    try {
+      revalidatePath('/', 'layout');
+      revalidatePath('/');
+    } catch (e) {
+      console.warn('Revalidation warning:', e);
+    }
+
     return NextResponse.json({ success: true, settings: updated });
   } catch (err: unknown) {
     console.error('Update settings error:', err);
