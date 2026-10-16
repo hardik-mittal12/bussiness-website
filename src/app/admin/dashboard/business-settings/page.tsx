@@ -280,42 +280,111 @@ export default function AdminBusinessSettingsPage() {
           </div>
         </div>
 
-        {/* Address and Hours */}
-        <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 pt-2">
-          <div className="sm:col-span-2">
+        {/* Physical Depot Location Details */}
+        <div className="space-y-4 pt-2">
+          <div>
             <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
-              Wholesale Depot Address
+              Wholesale Depot / Street Address
             </label>
             <input
               type="text"
               value={formData.address}
               onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+              placeholder="e.g. Commercial Market, Industrial Area"
               className="w-full px-3.5 py-2 text-xs rounded-lg border border-slate-300 focus:outline-hidden focus:ring-2 focus:ring-blue-950"
             />
           </div>
 
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
-              City / State
-            </label>
-            <input
-              type="text"
-              value={formData.city}
-              onChange={(e) => setFormData({ ...formData, city: e.target.value })}
-              placeholder="e.g. Agra, UP"
-              className="w-full px-3.5 py-2 text-xs rounded-lg border border-slate-300 focus:outline-hidden focus:ring-2 focus:ring-blue-950"
-            />
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
+                City / Market Hub
+              </label>
+              <input
+                type="text"
+                value={formData.city}
+                onChange={(e) => setFormData({ ...formData, city: e.target.value })}
+                placeholder="e.g. Chandigarh, Agra, Delhi"
+                className="w-full px-3.5 py-2 text-xs rounded-lg border border-slate-300 focus:outline-hidden focus:ring-2 focus:ring-blue-950"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
+                State / Territory
+              </label>
+              <input
+                type="text"
+                list="indian-states-list"
+                value={formData.state}
+                onChange={(e) => setFormData({ ...formData, state: e.target.value })}
+                placeholder="e.g. Chandigarh, Punjab, Delhi"
+                className="w-full px-3.5 py-2 text-xs rounded-lg border border-slate-300 focus:outline-hidden focus:ring-2 focus:ring-blue-950"
+              />
+              <datalist id="indian-states-list">
+                <option value="Andaman and Nicobar Islands" />
+                <option value="Andhra Pradesh" />
+                <option value="Arunachal Pradesh" />
+                <option value="Assam" />
+                <option value="Bihar" />
+                <option value="Chandigarh" />
+                <option value="Chhattisgarh" />
+                <option value="Dadra and Nagar Haveli and Daman and Diu" />
+                <option value="Delhi NCR" />
+                <option value="Goa" />
+                <option value="Gujarat" />
+                <option value="Haryana" />
+                <option value="Himachal Pradesh" />
+                <option value="Jammu and Kashmir" />
+                <option value="Jharkhand" />
+                <option value="Karnataka" />
+                <option value="Kerala" />
+                <option value="Ladakh" />
+                <option value="Lakshadweep" />
+                <option value="Madhya Pradesh" />
+                <option value="Maharashtra" />
+                <option value="Manipur" />
+                <option value="Meghalaya" />
+                <option value="Mizoram" />
+                <option value="Nagaland" />
+                <option value="Odisha" />
+                <option value="Puducherry" />
+                <option value="Punjab" />
+                <option value="Rajasthan" />
+                <option value="Sikkim" />
+                <option value="Tamil Nadu" />
+                <option value="Telangana" />
+                <option value="Tripura" />
+                <option value="Uttar Pradesh" />
+                <option value="Uttarakhand" />
+                <option value="West Bengal" />
+              </datalist>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
+                Pincode / Postal Code
+              </label>
+              <input
+                type="text"
+                value={formData.pincode}
+                onChange={(e) => setFormData({ ...formData, pincode: e.target.value })}
+                placeholder="e.g. 160017"
+                maxLength={10}
+                className="w-full px-3.5 py-2 text-xs font-mono rounded-lg border border-slate-300 focus:outline-hidden focus:ring-2 focus:ring-blue-950"
+              />
+            </div>
           </div>
 
           <div>
             <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
-              Operating Hours
+              Operating / Business Hours
             </label>
             <input
               type="text"
               value={formData.business_hours}
               onChange={(e) => setFormData({ ...formData, business_hours: e.target.value })}
-              placeholder="Mon–Sat: 10AM – 8PM"
+              placeholder="e.g. Monday to Saturday: 10:00 AM – 8:00 PM (Sunday Closed)"
               className="w-full px-3.5 py-2 text-xs rounded-lg border border-slate-300 focus:outline-hidden focus:ring-2 focus:ring-blue-950"
             />
           </div>
@@ -329,7 +398,7 @@ export default function AdminBusinessSettingsPage() {
             type="text"
             value={formData.service_areas}
             onChange={(e) => setFormData({ ...formData, service_areas: e.target.value })}
-            placeholder="Pan-India Transport, Delhi NCR, Uttar Pradesh, Rajasthan..."
+            placeholder="Pan-India Transport, North India, Punjab & Haryana, Delhi NCR, Rajasthan..."
             className="w-full px-3.5 py-2 text-xs rounded-lg border border-slate-300 focus:outline-hidden focus:ring-2 focus:ring-blue-950"
           />
         </div>

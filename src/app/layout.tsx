@@ -61,9 +61,9 @@ export default async function RootLayout({
       ? {
           '@type': 'PostalAddress',
           streetAddress: settings.address,
-          addressLocality: settings.city || 'Agra',
-          addressRegion: settings.state || 'Uttar Pradesh',
-          postalCode: settings.pincode || '282002',
+          addressLocality: settings.city || undefined,
+          addressRegion: settings.state || undefined,
+          postalCode: settings.pincode || undefined,
           addressCountry: 'IN',
         }
       : undefined,
