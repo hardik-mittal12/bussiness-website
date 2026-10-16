@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import Image from 'next/image';
 import { 
   Building2, 
   Save, 
@@ -16,13 +17,17 @@ import {
   CheckCircle2, 
   AlertCircle, 
   Loader2, 
-  Sparkles 
+  Sparkles,
+  Upload,
+  Trash2,
+  ImageIcon
 } from 'lucide-react';
 import { BusinessSettings } from '@/lib/types';
 
 export default function AdminBusinessSettingsPage() {
   const [loading, setLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [uploadingHero, setUploadingHero] = useState(false);
   const [notification, setNotification] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
   const [formData, setFormData] = useState({
@@ -123,6 +128,33 @@ export default function AdminBusinessSettingsPage() {
       });
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleHeroFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setUploadingHero(true);
+    try {
+      const uploadData = new FormData();
+      uploadData.append('file', file);
+      const res = await fetch('/api/admin/upload', {
+        method: 'POST',
+        body: uploadData,
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Upload failed');
+      setFormData((prev) => ({ ...prev, hero_image_url: data.url }));
+      setNotification({ type: 'success', message: 'Hero banner photo uploaded successfully! Click "Save & Publish Changes" to commit.' });
+    } catch (err: unknown) {
+      setNotification({
+        type: 'error',
+        message: err instanceof Error ? err.message : 'Hero photo upload failed',
+      });
+    } finally {
+      setUploadingHero(false);
+      e.target.value = '';
     }
   };
 
@@ -436,15 +468,80 @@ export default function AdminBusinessSettingsPage() {
         </div>
 
         <div>
-          <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
-            Hero Image URL
+          <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-2">
+            Hero Showcase Image
           </label>
-          <input
-            type="url"
-            value={formData.hero_image_url}
-            onChange={(e) => setFormData({ ...formData, hero_image_url: e.target.value })}
-            className="w-full px-3.5 py-2 text-xs rounded-lg border border-slate-300 focus:outline-hidden focus:ring-2 focus:ring-blue-950"
-          />
+
+          {formData.hero_image_url ? (
+            <div className="relative mb-3 rounded-xl border border-slate-200 overflow-hidden bg-slate-50 max-w-lg shadow-2xs">
+              <div className="relative aspect-16/9 w-full bg-slate-100">
+                <Image
+                  src={formData.hero_image_url}
+                  alt="Hero Banner Preview"
+                  fill
+                  className="object-cover"
+                />
+              </div>
+              <div className="p-3 bg-white border-t border-slate-100 flex items-center justify-between text-xs gap-2">
+                <span className="font-mono text-[11px] text-slate-500 truncate" title={formData.hero_image_url}>
+                  {formData.hero_image_url}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setFormData({ ...formData, hero_image_url: '' })}
+                  className="inline-flex items-center text-xs font-medium text-rose-600 hover:text-rose-800 px-2 py-1 hover:bg-rose-50 rounded transition-colors shrink-0"
+                  title="Remove Image"
+                >
+                  <Trash2 className="w-3.5 h-3.5 mr-1" />
+                  Remove
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="border border-dashed border-slate-300 rounded-xl p-6 text-center bg-slate-50 mb-3 max-w-lg">
+              <ImageIcon className="w-8 h-8 text-slate-400 mx-auto mb-2" />
+              <p className="text-xs text-slate-600 font-medium">No hero image configured yet</p>
+              <p className="text-[11px] text-slate-400 mt-0.5">Upload a high-quality photograph of your footwear collection or wholesale depot.</p>
+            </div>
+          )}
+
+          <div className="space-y-2 max-w-lg">
+            <div className="flex flex-wrap items-center gap-3">
+              <label className="inline-flex items-center justify-center px-4 py-2 bg-blue-950 hover:bg-blue-900 text-white text-xs font-semibold rounded-lg cursor-pointer shadow-xs transition-colors">
+                {uploadingHero ? (
+                  <>
+                    <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+                    Uploading Image...
+                  </>
+                ) : (
+                  <>
+                    <Upload className="w-3.5 h-3.5 mr-1.5" />
+                    Upload New Hero Photo
+                  </>
+                )}
+                <input
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp,image/avif"
+                  onChange={handleHeroFileUpload}
+                  className="hidden"
+                  disabled={uploadingHero}
+                />
+              </label>
+
+              <span className="text-xs text-slate-400">or enter image URL directly below</span>
+            </div>
+
+            <input
+              type="url"
+              placeholder="https://... or upload photo above"
+              value={formData.hero_image_url}
+              onChange={(e) => setFormData({ ...formData, hero_image_url: e.target.value })}
+              className="w-full px-3.5 py-2 text-xs font-mono rounded-lg border border-slate-300 focus:outline-hidden focus:ring-2 focus:ring-blue-950"
+            />
+            <p className="text-[10px] text-slate-400">
+              Recommended: 1200×800 or 1600×900 aspect ratio. Max file size: 5 MB (WebP, PNG, JPEG, AVIF).
+            </p>
+          </div>
         </div>
       </div>
 
